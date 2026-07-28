@@ -36,6 +36,7 @@ def create_session(
         candidate_id=candidate.id,
         created_by=current_user["id"],
         jd_text=payload.jd_text,
+        tts_provider=payload.tts_provider,
     )
     db.add(session)
     db.commit()

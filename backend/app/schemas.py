@@ -1,4 +1,6 @@
 from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, EmailStr
 
 
@@ -32,6 +34,7 @@ class SessionCreate(BaseModel):
     jd_text: str
     candidate_name: str
     candidate_email: str
+    tts_provider: Literal["sarvam", "supertonic"] = "sarvam"
 
 
 class SessionOut(BaseModel):
@@ -39,6 +42,7 @@ class SessionOut(BaseModel):
     candidate_id: int
     jd_text: str
     status: str
+    tts_provider: Literal["sarvam", "supertonic"]
     invite_token: str
     created_at: datetime
 

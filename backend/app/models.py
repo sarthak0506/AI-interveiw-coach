@@ -53,6 +53,7 @@ class InterviewSession(Base):
 
     jd_text = Column(Text, nullable=False)
     status = Column(String, default="draft")  # draft | invited | in_progress | completed
+    tts_provider = Column(String, default="sarvam")  # "sarvam" | "supertonic"
     invite_token = Column(String, unique=True, index=True, default=lambda: secrets.token_urlsafe(24))
 
     created_at = Column(DateTime(timezone=True), default=utcnow)
