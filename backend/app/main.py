@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
-from app.routers import auth
+from app.routers import auth, sessions, interview
 
 # no Alembic yet — this auto-creates tables on startup, fine for dev.
 # swap to proper migrations before this touches a real production database.
@@ -19,7 +19,8 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
-
+app.include_router(sessions.router)
+app.include_router(interview.router)
 
 @app.get("/")
 def root():
