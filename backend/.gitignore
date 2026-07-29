@@ -1,0 +1,7 @@
+
+# Local test scripts and audio (not part of the app)
+download_medium.py
+download_models.py
+test_audio.wav
+test_groq_whisper.py
+test_whisper.py

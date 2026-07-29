@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-.env"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 12  # 12 hours
+
     llm_api_key: str = ""
     llm_model: str = "openai/gpt-4o-mini"
     llm_base_url: str = "https://openrouter.ai/api/v1"
@@ -31,6 +32,7 @@ class Settings(BaseSettings):
     elevenlabs_voice_id: str = ""
     elevenlabs_model: str = "eleven_turbo_v2_5"
     daily_api_key: str = ""
+
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
