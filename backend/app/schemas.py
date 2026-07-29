@@ -35,6 +35,7 @@ class SessionCreate(BaseModel):
     candidate_name: str
     candidate_email: str
     tts_provider: Literal["sarvam", "supertonic"] = "sarvam"
+    stt_provider: Literal["whisper", "seamless"] = "whisper"
 
 
 class SessionOut(BaseModel):
@@ -43,6 +44,7 @@ class SessionOut(BaseModel):
     jd_text: str
     status: str
     tts_provider: Literal["sarvam", "supertonic"]
+    stt_provider: Literal["whisper", "seamless"]
     invite_token: str
     created_at: datetime
 

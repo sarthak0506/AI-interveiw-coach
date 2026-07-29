@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     fallback_model: str = ""
     # Groq credential used by speech-to-text, not by the LLM fallback.
     groq_api_key: str = ""
+    whisper_endpoint: str = "http://127.0.0.1:8002"
+    seamless_endpoint: str = "http://127.0.0.1:8003"
     sarvam_api_key: str = ""
     sarvam_model: str = "bulbul:v3"
     sarvam_speaker: str = "shubh"
@@ -28,6 +30,7 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     elevenlabs_voice_id: str = ""
     elevenlabs_model: str = "eleven_turbo_v2_5"
+    daily_api_key: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

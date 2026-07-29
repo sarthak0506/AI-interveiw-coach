@@ -1,23 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models import InterviewSession, Candidate, Question
+from app.deps import get_current_user, get_db
+from app.models import InterviewSession, Candidate, Question, User
 from app.schemas import SessionCreate, SessionOut, QuestionCreate, QuestionOut
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
-
-
-# TEMPORARY — replace with real app.deps.get_current_user once backend/auth merges
-def get_current_user():
-    return {"id": 1, "email": "dev@test.com"}
 
 
 @router.post("", response_model=SessionOut)
 def create_session(
     payload: SessionCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     candidate = (
         db.query(Candidate)
@@ -34,9 +29,10 @@ def create_session(
 
     session = InterviewSession(
         candidate_id=candidate.id,
-        created_by=current_user["id"],
+        created_by=current_user.id,
         jd_text=payload.jd_text,
         tts_provider=payload.tts_provider,
+        stt_provider=payload.stt_provider,
     )
     db.add(session)
     db.commit()
@@ -49,13 +45,13 @@ def add_question(
     session_id: int,
     payload: QuestionCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     session = (
         db.query(InterviewSession)
         .filter(
             InterviewSession.id == session_id,
-            InterviewSession.created_by == current_user["id"],
+            InterviewSession.created_by == current_user.id,
         )
         .first()
     )
@@ -81,11 +77,11 @@ def add_question(
 @router.get("", response_model=list[SessionOut])
 def list_sessions(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     return (
         db.query(InterviewSession)
-        .filter(InterviewSession.created_by == current_user["id"])
+        .filter(InterviewSession.created_by == current_user.id)
         .order_by(InterviewSession.created_at.desc())
         .all()
     )
