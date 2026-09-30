@@ -19,7 +19,7 @@ backend/
       sessions.py        # /sessions — HR creates sessions + questions
       interview.py       # /interview/{invite_token} — candidate join + Daily room
     agents/              # interview AI logic
-      llm.py             # LLM client (OpenRouter primary, Groq fallback)
+      llm.py             # LLM client (Gemini primary, Groq fallback)
       interviewer_agent.py  # follow-up vs. next-question decision loop
       stt.py             # speech-to-text (Whisper/Seamless local, Groq fallback)
       tts.py             # text-to-speech (Supertonic/Sarvam, ElevenLabs fallback)
