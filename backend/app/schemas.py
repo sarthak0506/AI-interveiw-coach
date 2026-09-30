@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class UserCreate(BaseModel):
@@ -34,6 +34,8 @@ class SessionCreate(BaseModel):
     jd_text: str
     candidate_name: str
     candidate_email: str
+    resume_text: str | None = None
+    assessment: dict | None = None
     tts_provider: Literal["sarvam", "supertonic"] = "sarvam"
     stt_provider: Literal["whisper", "seamless"] = "whisper"
 
@@ -47,6 +49,8 @@ class SessionOut(BaseModel):
     stt_provider: Literal["whisper", "seamless"]
     invite_token: str
     created_at: datetime
+    match_score: int | None = None
+    match_report: dict | None = None
 
     class Config:
         from_attributes = True
@@ -75,6 +79,12 @@ class InterviewSessionOut(BaseModel):
     jd_text: str
     status: str
     questions: list[QuestionOut]
+    match_score: int | None = None
+    match_report: dict | None = None
 
     class Config:
         from_attributes = True
+
+
+class PracticeAnswerCreate(BaseModel):
+    answer: str = Field(min_length=1, max_length=12000)
