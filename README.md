@@ -39,6 +39,18 @@ docker-compose.yml       # Postgres 16 for local dev
 - Node 18+
 - Postgres — either via Docker Compose below, or use SQLite for zero setup
 
+## Quick start
+
+On macOS or Linux, run all three apps with:
+
+```bash
+./run.sh
+```
+
+The script creates the Python virtual environment and keeps backend dependencies
+in sync on each run. The local backend `.env` uses SQLite, so Docker is not required.
+Add provider API keys to `backend/.env` to enable AI voice features.
+
 ## 1. Database
 
 With Docker (Postgres on host port **5433**, matching `.env.example`):
@@ -94,6 +106,22 @@ npm run dev                    # http://localhost:3000
 
 Both ports are already in the backend's CORS allowlist. `npm run build` emits
 to `dist/`, `npm run preview` serves that build.
+
+## Resume-based practice
+
+From the HR portal, upload a text-based PDF, DOCX, or TXT job description and
+resume (8 MB maximum each). The Gemini model configured by `LLM_API_KEY`
+estimates role alignment, highlights strengths and learning gaps, and drafts
+editable interview questions. Create the session to get a candidate invite
+link.
+
+Students can use that link to answer the questions in an AI-guided text practice
+round. Each answer receives a score and coaching notes; the final report gives
+next steps, and additional rounds are saved so students can compare progress.
+The resume, answers, and reports are stored in the configured database and are
+available to anyone with the invite link. Scores are educational estimates,
+not hiring decisions. The existing Daily video room remains an optional,
+separate feature; the coached practice round is text-based.
 
 ## Manual test scripts
 
