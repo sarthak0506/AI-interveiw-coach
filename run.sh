@@ -31,20 +31,14 @@ fi
 if [[ ! -f "$ROOT_DIR/frontend/hr-portal/.env" ]]; then
   cp "$ROOT_DIR/frontend/hr-portal/.env.example" "$ROOT_DIR/frontend/hr-portal/.env"
 fi
-if [[ ! -f "$ROOT_DIR/frontend/candidate-app/.env" ]]; then
-  cp "$ROOT_DIR/frontend/candidate-app/.env.example" "$ROOT_DIR/frontend/candidate-app/.env"
-fi
-
 if [[ ! -x "$VENV_DIR/bin/python" ]]; then
   python3 -m venv "$VENV_DIR"
 fi
 "$VENV_DIR/bin/python" -m pip install --disable-pip-version-check -r "$BACKEND_DIR/requirements.txt"
 
-for app_dir in "$ROOT_DIR/frontend/hr-portal" "$ROOT_DIR/frontend/candidate-app"; do
-  if [[ ! -d "$app_dir/node_modules" ]]; then
-    (cd "$app_dir" && npm ci)
-  fi
-done
+if [[ ! -d "$ROOT_DIR/frontend/hr-portal/node_modules" ]]; then
+  (cd "$ROOT_DIR/frontend/hr-portal" && npm ci)
+fi
 
 if grep -q '^DATABASE_URL=postgresql' "$BACKEND_DIR/.env"; then
   if ! command -v docker >/dev/null 2>&1; then
@@ -58,11 +52,8 @@ fi
 PIDS+=("$!")
 (cd "$ROOT_DIR/frontend/hr-portal" && npm run dev -- --host 0.0.0.0) &
 PIDS+=("$!")
-(cd "$ROOT_DIR/frontend/candidate-app" && npm run dev -- --host 0.0.0.0) &
-PIDS+=("$!")
 
-echo "HR portal:     http://localhost:5173"
-echo "Candidate app: http://localhost:3000"
+echo "Student app:   http://localhost:5173"
 echo "Backend API:   http://localhost:8000/docs"
 echo "Press Ctrl+C to stop all services."
 wait -n "${PIDS[@]}"

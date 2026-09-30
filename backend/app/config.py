@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-.env"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 12  # 12 hours
+    invite_validity_days: int = 30
 
     llm_api_key: str = ""
     llm_model: str = "gemini-2.5-flash"

@@ -10,17 +10,27 @@ logger = logging.getLogger(__name__)
 
 class BaseSTT(ABC):
     @abstractmethod
-    async def transcribe(self, audio_bytes: bytes) -> str:
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        filename: str = "audio.wav",
+        content_type: str = "audio/wav",
+    ) -> str:
         raise NotImplementedError
 
 
 class GroqSTT(BaseSTT):
     API_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 
-    async def transcribe(self, audio_bytes: bytes) -> str:
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        filename: str = "audio.wav",
+        content_type: str = "audio/wav",
+    ) -> str:
         headers = {"Authorization": f"Bearer {settings.groq_api_key}"}
         files = {
-            "file": ("audio.wav", audio_bytes, "application/octet-stream"),
+            "file": (filename, audio_bytes, content_type),
         }
         data = {"model": "whisper-large-v3-turbo"}
 
@@ -42,9 +52,14 @@ class StubSTT(BaseSTT):
 
 
 class WhisperSTT(BaseSTT):
-    async def transcribe(self, audio_bytes: bytes) -> str:
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        filename: str = "audio.wav",
+        content_type: str = "audio/wav",
+    ) -> str:
         files = {
-            "file": ("audio.wav", audio_bytes, "application/octet-stream"),
+            "file": (filename, audio_bytes, content_type),
         }
 
         try:
@@ -64,9 +79,14 @@ class WhisperSTT(BaseSTT):
 
 
 class SeamlessSTT(BaseSTT):
-    async def transcribe(self, audio_bytes: bytes) -> str:
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        filename: str = "audio.wav",
+        content_type: str = "audio/wav",
+    ) -> str:
         files = {
-            "file": ("audio.wav", audio_bytes, "application/octet-stream"),
+            "file": (filename, audio_bytes, content_type),
         }
 
         try:
@@ -90,15 +110,20 @@ class FallbackSTT(BaseSTT):
         self.primary = primary
         self.fallback = fallback
 
-    async def transcribe(self, audio_bytes: bytes) -> str:
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        filename: str = "audio.wav",
+        content_type: str = "audio/wav",
+    ) -> str:
         try:
-            return await self.primary.transcribe(audio_bytes)
+            return await self.primary.transcribe(audio_bytes, filename, content_type)
         except Exception:
             logger.warning(
                 "Primary STT failed; retrying with fallback provider",
                 exc_info=True,
             )
-            return await self.fallback.transcribe(audio_bytes)
+            return await self.fallback.transcribe(audio_bytes, filename, content_type)
 
 
 def get_stt(primary_provider: str) -> BaseSTT:

@@ -2,11 +2,13 @@ import DailyIframe from "@daily-co/daily-js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { fetchJson } from "../api/client";
+import { fetchJson, setCandidateToken } from "../api/client";
 import PageShell from "../components/PageShell";
 
-function PracticePanel({ token, matchScore, matchReport, questionCount }) {
+function PracticePanel({ token, questionCount }) {
+  const [account, setAccount] = useState(null);
   const [attempts, setAttempts] = useState([]);
+  const [matchProfile, setMatchProfile] = useState(null);
   const [attempt, setAttempt] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [answer, setAnswer] = useState("");
@@ -14,12 +16,21 @@ function PracticePanel({ token, matchScore, matchReport, questionCount }) {
   const [scoreChange, setScoreChange] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [authMode, setAuthMode] = useState("login");
+  const [authForm, setAuthForm] = useState({ email: "", password: "", consent: false });
 
   useEffect(() => {
     let active = true;
-    fetchJson(`/interview/${encodeURIComponent(token)}/attempts`)
-      .then((data) => {
+    if (!localStorage.getItem("candidateAccessToken")) return () => {};
+    Promise.all([
+      fetchJson("/candidate-auth/me"),
+      fetchJson(`/interview/${encodeURIComponent(token)}/profile`),
+      fetchJson(`/interview/${encodeURIComponent(token)}/attempts`),
+    ])
+      .then(([candidate, profile, data]) => {
         if (!active) return;
+        setAccount(candidate);
+        setMatchProfile(profile);
         setAttempts(data);
         const inProgress = data.find((item) => item.status === "in_progress");
         if (inProgress) {
@@ -28,12 +39,94 @@ function PracticePanel({ token, matchScore, matchReport, questionCount }) {
         }
       })
       .catch((requestError) => {
-        if (active) setError(requestError.message);
+        if (!active) return;
+        if (requestError.status === 401) {
+          setCandidateToken(null);
+          setError("Your sign-in expired. Please sign in again to open your practice history.");
+        } else if (requestError.status === 404) {
+          setError("This invite is not linked to the signed-in candidate account.");
+        } else {
+          setError(requestError.message);
+        }
       });
     return () => {
       active = false;
     };
   }, [token]);
+
+  const authenticate = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const endpoint = authMode === "register" ? "/candidate-auth/register" : "/candidate-auth/login";
+      const payload = authMode === "register"
+        ? { ...authForm, invite_token: token }
+        : { email: authForm.email, password: authForm.password };
+      const result = await fetchJson(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      setCandidateToken(result.access_token);
+      const [profile, data] = await Promise.all([
+        fetchJson(`/interview/${encodeURIComponent(token)}/profile`),
+        fetchJson(`/interview/${encodeURIComponent(token)}/attempts`),
+      ]);
+      setAccount(result.candidate);
+      setMatchProfile(profile);
+      setAttempts(data);
+      const inProgress = data.find((item) => item.status === "in_progress");
+      if (inProgress) {
+        setAttempt(inProgress);
+        setCurrentQuestion(inProgress.current_question);
+      }
+    } catch (requestError) {
+      setCandidateToken(null);
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const signOut = () => {
+    setCandidateToken(null);
+    setAccount(null);
+    setAttempts([]);
+    setAttempt(null);
+    setCurrentQuestion(null);
+    setMatchProfile(null);
+    setReport(null);
+    setError("");
+  };
+
+  const downloadData = async () => {
+    setError("");
+    try {
+      const data = await fetchJson("/candidate-auth/me/export");
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "interview-coach-data.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!window.confirm("Permanently delete your candidate account, resume, interview sessions, and practice history?")) return;
+    setBusy(true);
+    try {
+      await fetchJson("/candidate-auth/me", { method: "DELETE" });
+      signOut();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const beginPractice = async () => {
     setBusy(true);
@@ -113,25 +206,66 @@ function PracticePanel({ token, matchScore, matchReport, questionCount }) {
             Answer role-specific questions, review coaching notes after each response, then retry and compare your progress.
           </p>
         </div>
-        {matchScore != null && (
+        {account && matchProfile?.match_score != null && (
           <div className="shrink-0 border-l-2 border-calm-600 pl-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Resume match</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{matchScore}<span className="text-sm font-medium text-slate-500"> / 100</span></p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{matchProfile.match_score}<span className="text-sm font-medium text-slate-500"> / 100</span></p>
           </div>
         )}
       </div>
 
-      {matchReport && (
+      {account && matchProfile?.match_report && (
         <div className="mt-5 grid gap-4 border-b border-slate-200 pb-5 sm:grid-cols-3">
-          <InsightList title="Your strengths" items={matchReport.strengths} />
-          <InsightList title="Build these skills" items={matchReport.gaps} />
-          <InsightList title="Preparation plan" items={matchReport.study_plan} />
+          <InsightList title="Your strengths" items={matchProfile.match_report.strengths} />
+          <InsightList title="Build these skills" items={matchProfile.match_report.gaps} />
+          <InsightList title="Preparation plan" items={matchProfile.match_report.study_plan} />
         </div>
       )}
 
       {error && <p role="alert" className="mt-4 text-sm font-medium text-red-700">{error}</p>}
 
-      {!attempt && !report && (
+      {!account && (
+        <div className="mt-5 max-w-xl border-t border-slate-200 pt-5">
+          <div className="mb-4 flex gap-5 border-b border-slate-200">
+            <button type="button" onClick={() => setAuthMode("login")} className={`border-b-2 pb-2 text-sm font-semibold ${authMode === "login" ? "border-calm-600 text-calm-800" : "border-transparent text-slate-500"}`}>
+              Sign in
+            </button>
+            <button type="button" onClick={() => setAuthMode("register")} className={`border-b-2 pb-2 text-sm font-semibold ${authMode === "register" ? "border-calm-600 text-calm-800" : "border-transparent text-slate-500"}`}>
+              Create student account
+            </button>
+          </div>
+          <form onSubmit={authenticate} className="space-y-4">
+            <div>
+              <label htmlFor="candidate-email" className="field-label">Invite email</label>
+              <input id="candidate-email" type="email" autoComplete="email" required value={authForm.email} onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })} className="field-input" />
+            </div>
+            <div>
+              <label htmlFor="candidate-password" className="field-label">Password</label>
+              <input id="candidate-password" type="password" autoComplete={authMode === "register" ? "new-password" : "current-password"} minLength={authMode === "register" ? 10 : undefined} maxLength={72} required value={authForm.password} onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })} className="field-input" />
+            </div>
+            {authMode === "register" && (
+              <label className="flex items-start gap-3 text-sm leading-5 text-slate-600">
+                <input type="checkbox" required checked={authForm.consent} onChange={(event) => setAuthForm({ ...authForm, consent: event.target.checked })} className="mt-1 accent-calm-700" />
+                <span>I consent to storing my resume and practice answers and processing them with the configured AI provider for coaching. I can export or delete my data later.</span>
+              </label>
+            )}
+            <button type="submit" disabled={busy} className="btn-primary">
+              {busy ? "Please wait…" : authMode === "register" ? "Create account and continue" : "Sign in to practice"}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {account && (
+        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
+          <p className="mr-auto text-sm text-slate-600">Signed in as <span className="font-semibold text-slate-800">{account.email}</span></p>
+          <button type="button" onClick={downloadData} disabled={busy} className="btn-secondary">Export my data</button>
+          <button type="button" onClick={signOut} className="btn-secondary">Sign out</button>
+          <button type="button" onClick={deleteAccount} disabled={busy} className="text-sm font-semibold text-red-700 underline">Delete account and data</button>
+        </div>
+      )}
+
+      {account && !attempt && !report && (
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <button type="button" onClick={beginPractice} disabled={busy} className="btn-primary">
             {busy ? "Opening practice…" : completedAttempts.length ? "Start another practice round" : "Start AI practice interview"}

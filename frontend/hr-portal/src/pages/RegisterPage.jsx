@@ -8,7 +8,7 @@ import { Alert, AuthLayout } from "./LoginPage";
 export default function RegisterPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ full_name: "", email: "", password: "" });
+  const [form, setForm] = useState({ full_name: "", email: "", password: "", consent: false });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,7 +38,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <AuthLayout title="Create HR account" subtitle="Set up access to the interview portal.">
+    <AuthLayout title="Create your student account" subtitle="Keep your practice sessions and learning progress in one place.">
       {error && <Alert tone="error">{error}</Alert>}
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
@@ -52,7 +52,7 @@ export default function RegisterPage() {
             value={form.full_name}
             onChange={updateField}
             className="field-input"
-            placeholder="Priya Sharma"
+            placeholder="Your name"
           />
         </div>
         <div>
@@ -66,7 +66,7 @@ export default function RegisterPage() {
             value={form.email}
             onChange={updateField}
             className="field-input"
-            placeholder="hr@company.com"
+            placeholder="you@example.com"
           />
         </div>
         <div>
@@ -82,8 +82,19 @@ export default function RegisterPage() {
             onChange={updateField}
             className="field-input"
           />
-          <p className="mt-1.5 text-xs text-slate-500">Use at least 8 characters.</p>
+          <p className="mt-1.5 text-xs text-slate-500">Use 8 to 72 characters.</p>
         </div>
+        <label className="flex items-start gap-3 text-sm leading-5 text-slate-600">
+          <input
+            type="checkbox"
+            name="consent"
+            required
+            checked={form.consent}
+            onChange={(event) => setForm((current) => ({ ...current, consent: event.target.checked }))}
+            className="mt-1 h-4 w-4 shrink-0 accent-brand-600"
+          />
+          <span>I agree to store my resume, practice answers, and feedback in my account so I can review and compare practice sessions.</span>
+        </label>
         <button type="submit" disabled={submitting} className="btn-primary w-full">
           {submitting ? "Creating account…" : "Create account"}
         </button>

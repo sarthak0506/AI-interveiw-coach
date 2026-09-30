@@ -8,7 +8,8 @@ from app.agents.documents import extract_document_text
 from app.agents.llm import get_llm
 from app.config import settings
 from app.deps import get_current_user, get_db
-from app.models import InterviewSession, Candidate, Question, SessionAssessment, User
+from app.invites import create_invite_access, get_or_create_invite_access
+from app.models import InterviewSession, Candidate, InviteAccess, Question, SessionAssessment, User, utcnow
 from app.schemas import SessionCreate, SessionOut, QuestionCreate, QuestionOut
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -49,21 +50,23 @@ def create_session(
 ):
     candidate = (
         db.query(Candidate)
-        .filter(Candidate.email == payload.candidate_email)
+        .join(InterviewSession, Candidate.id == InterviewSession.candidate_id)
+        .filter(
+            Candidate.email == current_user.email,
+            InterviewSession.created_by == current_user.id,
+        )
         .first()
     )
     if candidate is None:
         candidate = Candidate(
-            name=payload.candidate_name,
-            email=payload.candidate_email,
+            name=current_user.full_name,
+            email=current_user.email,
             resume_text=payload.resume_text,
         )
         db.add(candidate)
         db.flush()
-    else:
-        candidate.name = payload.candidate_name
-        if payload.resume_text:
-            candidate.resume_text = payload.resume_text
+    elif payload.resume_text:
+        candidate.resume_text = payload.resume_text
 
     session = InterviewSession(
         candidate_id=candidate.id,
@@ -73,6 +76,8 @@ def create_session(
         stt_provider=payload.stt_provider,
     )
     db.add(session)
+    db.flush()
+    db.add(create_invite_access(session.id))
     db.commit()
     db.refresh(session)
     if payload.assessment:
@@ -125,14 +130,48 @@ def add_question(
     return question
 
 
+@router.post("/{session_id}/revoke-invite")
+def revoke_invite(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = (
+        db.query(InterviewSession)
+        .filter(
+            InterviewSession.id == session_id,
+            InterviewSession.created_by == current_user.id,
+        )
+        .first()
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    access = session.invite_access
+    if access is None:
+        access = get_or_create_invite_access(session, db)
+    if access.revoked_at is None:
+        access.revoked_at = utcnow()
+        db.commit()
+    return {"revoked": True}
+
+
 @router.get("", response_model=list[SessionOut])
 def list_sessions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return (
+    sessions = (
         db.query(InterviewSession)
         .filter(InterviewSession.created_by == current_user.id)
         .order_by(InterviewSession.created_at.desc())
         .all()
     )
+    initialized_access = False
+    for session in sessions:
+        if session.invite_access is None:
+            get_or_create_invite_access(session, db)
+            initialized_access = True
+    if initialized_access:
+        db.commit()
+    return sessions

@@ -46,3 +46,23 @@ export async function fetchJson(path, options = {}) {
 
   return data;
 }
+
+export async function fetchBlob(path, options = {}) {
+  const { headers: customHeaders, ...fetchOptions } = options;
+  const headers = new Headers(customHeaders);
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+
+  let response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { ...fetchOptions, headers });
+  } catch {
+    throw new Error("Unable to reach the server. Check that the backend is running.");
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.detail || `Request failed with status ${response.status}`);
+  }
+
+  return response.blob();
+}

@@ -20,7 +20,7 @@ def utcnow() -> datetime:
 
 
 class User(Base):
-    """HR admin account."""
+    """Student account used to own interview practice sessions."""
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -30,6 +30,17 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     sessions_created = relationship("InterviewSession", back_populates="created_by_user")
+    practice_consent = relationship("PracticeConsent", back_populates="user", uselist=False)
+
+
+class PracticeConsent(Base):
+    __tablename__ = "practice_consents"
+
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    consent_at = Column(DateTime(timezone=True), nullable=False)
+    consent_version = Column(String, nullable=False)
+
+    user = relationship("User", back_populates="practice_consent")
 
 
 class Candidate(Base):
@@ -66,6 +77,7 @@ class InterviewSession(Base):
     transcript_entries = relationship("Transcript", back_populates="session")
     assessment = relationship("SessionAssessment", back_populates="session", uselist=False)
     practice_attempts = relationship("PracticeAttempt", back_populates="session")
+    invite_access = relationship("InviteAccess", back_populates="session", uselist=False)
 
     @property
     def match_score(self) -> int | None:
@@ -78,6 +90,14 @@ class InterviewSession(Base):
         import json
 
         return json.loads(self.assessment.report_json)
+
+    @property
+    def invite_expires_at(self) -> datetime | None:
+        return self.invite_access.expires_at if self.invite_access else None
+
+    @property
+    def invite_revoked(self) -> bool:
+        return bool(self.invite_access and self.invite_access.revoked_at)
 
 
 class Question(Base):
@@ -114,6 +134,17 @@ class SessionAssessment(Base):
     report_json = Column(Text, nullable=False)
 
     session = relationship("InterviewSession", back_populates="assessment")
+
+
+class InviteAccess(Base):
+    __tablename__ = "invite_access"
+
+    session_id = Column(Integer, ForeignKey("interview_sessions.id"), primary_key=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+    session = relationship("InterviewSession", back_populates="invite_access")
 
 
 class PracticeAttempt(Base):
