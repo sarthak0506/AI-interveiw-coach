@@ -13,11 +13,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 12  # 12 hours
 
     llm_api_key: str = ""
-    llm_model: str = "openai/gpt-4o-mini"
-    llm_base_url: str = "https://openrouter.ai/api/v1"
-    llm_fallback_provider: str = "groq"
+    llm_model: str = "gemini-2.5-flash"
     fallback_api_key: str = ""
-    fallback_model: str = ""
+    fallback_model: str = "llama-3.3-70b-versatile"
     # Groq credential used by speech-to-text, not by the LLM fallback.
     groq_api_key: str = ""
     whisper_endpoint: str = "http://127.0.0.1:8002"
