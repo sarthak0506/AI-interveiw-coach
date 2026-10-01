@@ -5,6 +5,7 @@ import { useAuth } from "./context/AuthContext";
 import CreateSessionPage from "./pages/CreateSessionPage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
+import PracticePage from "./pages/PracticePage";
 import RegisterPage from "./pages/RegisterPage";
 
 function HomeRedirect() {
@@ -21,6 +22,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/sessions/new" element={<CreateSessionPage />} />
+        <Route path="/practice/:sessionId" element={<PracticePage />} />
       </Route>
       <Route path="*" element={<HomeRedirect />} />
     </Routes>

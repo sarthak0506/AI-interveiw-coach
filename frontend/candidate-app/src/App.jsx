@@ -1,14 +1,11 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
 
-import HomePage from "./pages/HomePage";
-import InterviewPage from "./pages/InterviewPage";
+const STUDENT_APP_URL = import.meta.env.VITE_STUDENT_APP_URL || "http://localhost:5173";
 
 export default function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/interview/:token" element={<InterviewPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
+  useEffect(() => {
+    window.location.replace(STUDENT_APP_URL);
+  }, []);
+
+  return null;
 }

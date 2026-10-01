@@ -1,18 +1,29 @@
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.agents.coach import InterviewCoach
 from app.agents.llm import get_llm
 from app.agents.room import create_daily_room, create_daily_token
-from app.deps import get_db
-from app.models import InterviewSession, PracticeAnswer, PracticeAttempt, Question
-from app.schemas import InterviewSessionOut, PracticeAnswerCreate
+from app.agents.stt import get_stt
+from app.agents.tts import get_tts
+from app.deps import get_current_user, get_db
+from app.invites import ensure_invite_active
+from app.models import InterviewSession, PracticeAnswer, PracticeAttempt, Question, User
+from app.schemas import (
+    InterviewSessionOut,
+    PracticeAnswerCreate,
+    PracticeSpeechRequest,
+    SessionDetailOut,
+)
 
 router = APIRouter(prefix="/interview", tags=["interview"])
+MAX_AUDIO_BYTES = 15 * 1024 * 1024
+SUPPORTED_AUDIO_SUFFIXES = {".webm", ".ogg", ".mp4", ".wav", ".mp3", ".mpeg"}
 
 
 def _find_session(invite_token: str, db: Session) -> InterviewSession:
@@ -23,6 +34,21 @@ def _find_session(invite_token: str, db: Session) -> InterviewSession:
     )
     if session is None:
         raise HTTPException(status_code=404, detail="Invalid or expired invite link")
+    ensure_invite_active(session, db)
+    return session
+
+
+def _find_owned_session(session_id: int, db: Session, user: User) -> InterviewSession:
+    session = (
+        db.query(InterviewSession)
+        .filter(
+            InterviewSession.id == session_id,
+            InterviewSession.created_by == user.id,
+        )
+        .first()
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Practice session not found")
     return session
 
 
@@ -60,9 +86,80 @@ def get_interview_by_token(invite_token: str, db: Session = Depends(get_db)):
     return _find_session(invite_token, db)
 
 
-@router.get("/{invite_token}/attempts")
-def list_practice_attempts(invite_token: str, db: Session = Depends(get_db)):
-    session = _find_session(invite_token, db)
+@router.get("/sessions/{session_id}", response_model=SessionDetailOut)
+def get_practice_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return _find_owned_session(session_id, db, user)
+
+
+@router.post("/sessions/{session_id}/transcribe")
+async def transcribe_practice_answer(
+    session_id: int,
+    audio: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    session = _find_owned_session(session_id, db, user)
+    suffix = Path(audio.filename or "").suffix.lower()
+    if suffix not in SUPPORTED_AUDIO_SUFFIXES or not (audio.content_type or "").startswith("audio/"):
+        raise HTTPException(status_code=415, detail="Record audio in a supported browser format")
+    audio_bytes = await audio.read(MAX_AUDIO_BYTES + 1)
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="The audio recording was empty")
+    if len(audio_bytes) > MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=413, detail="Keep recordings under 15 MB")
+
+    try:
+        transcription = await get_stt(session.stt_provider).transcribe(
+            audio_bytes,
+            filename=f"answer{suffix}",
+            content_type=audio.content_type,
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=502,
+            detail="Transcription failed. Check STT provider configuration or type your answer instead.",
+        ) from error
+    if not transcription.strip():
+        raise HTTPException(status_code=422, detail="No speech was detected. Try recording again or type your answer.")
+    return {"transcription": transcription.strip()[:12000]}
+
+
+@router.post("/sessions/{session_id}/speak")
+async def speak_practice_prompt(
+    session_id: int,
+    payload: PracticeSpeechRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    session = _find_owned_session(session_id, db, user)
+    try:
+        audio_bytes = await get_tts(session.tts_provider).synthesize(payload.text.strip())
+    except Exception as error:
+        raise HTTPException(
+            status_code=502,
+            detail="Question audio is unavailable. You can continue reading the question on screen.",
+        ) from error
+
+    if audio_bytes.startswith(b"RIFF"):
+        media_type = "audio/wav"
+    elif audio_bytes.startswith(b"ID3") or (audio_bytes[:1] == b"\xff" and audio_bytes[1:2] in {b"\xfb", b"\xf3", b"\xf2"}):
+        media_type = "audio/mpeg"
+    else:
+        media_type = "audio/wav" if session.tts_provider in {"sarvam", "supertonic"} else "application/octet-stream"
+    return Response(content=audio_bytes, media_type=media_type)
+
+
+@router.get("/sessions/{session_id}/attempts")
+def list_practice_attempts(
+    session_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    session = _find_owned_session(session_id, db, user)
     questions = list(session.questions)
     attempts = (
         db.query(PracticeAttempt)
@@ -73,9 +170,13 @@ def list_practice_attempts(invite_token: str, db: Session = Depends(get_db)):
     return [_attempt_result(attempt, questions) for attempt in attempts]
 
 
-@router.post("/{invite_token}/attempts")
-def start_practice_attempt(invite_token: str, db: Session = Depends(get_db)):
-    session = _find_session(invite_token, db)
+@router.post("/sessions/{session_id}/attempts")
+def start_practice_attempt(
+    session_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    session = _find_owned_session(session_id, db, user)
     questions = list(session.questions)
     if not questions:
         raise HTTPException(status_code=400, detail="This interview has no questions yet")
@@ -99,14 +200,15 @@ def start_practice_attempt(invite_token: str, db: Session = Depends(get_db)):
     return _attempt_result(attempt, questions)
 
 
-@router.post("/{invite_token}/attempts/{attempt_id}/answers")
+@router.post("/sessions/{session_id}/attempts/{attempt_id}/answers")
 async def submit_practice_answer(
-    invite_token: str,
+    session_id: int,
     attempt_id: int,
     payload: PracticeAnswerCreate,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    session = _find_session(invite_token, db)
+    session = _find_owned_session(session_id, db, user)
     attempt = (
         db.query(PracticeAttempt)
         .filter(
@@ -184,8 +286,19 @@ async def submit_practice_answer(
     try:
         report = await coach.summarize_attempt(session.jd_text, answer_records)
     except Exception:
+        rubric = {
+            dimension: {
+                "score": round(sum(
+                    item["feedback"]["rubric"][dimension]["score"]
+                    for item in answer_records
+                ) / len(answer_records)),
+                "feedback": f"Average across {len(answer_records)} answer(s).",
+            }
+            for dimension in ("relevance", "evidence", "structure", "clarity")
+        }
         report = {
-            "score": round(sum(item["score"] for item in answer_records) / len(answer_records)),
+            "score": round(sum(item["score"] for item in rubric.values()) * 2.5),
+            "rubric": rubric,
             "summary": "Your practice round is complete. Review the answer-level notes and focus on the growth areas below.",
             "strengths": list(dict.fromkeys(
                 point for item in answer_records for point in item["feedback"]["strengths"]
@@ -210,15 +323,13 @@ async def submit_practice_answer(
     }
 
 
-@router.post("/{invite_token}/join")
-async def join_interview(invite_token: str, db: Session = Depends(get_db)):
-    session = (
-        db.query(InterviewSession)
-        .filter(InterviewSession.invite_token == invite_token)
-        .first()
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Invalid or expired invite link")
+@router.post("/sessions/{session_id}/join")
+async def join_interview(
+    session_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    session = _find_owned_session(session_id, db, user)
 
     if session.daily_room_url is None:
         session.daily_room_url = await create_daily_room(session.id)

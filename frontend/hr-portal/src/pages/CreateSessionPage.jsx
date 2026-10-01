@@ -15,10 +15,6 @@ export default function CreateSessionPage() {
   const [form, setForm] = useState({
     jd_text: "",
     resume_text: "",
-    candidate_name: "",
-    candidate_email: "",
-    tts_provider: "sarvam",
-    stt_provider: "whisper",
   });
   const [questions, setQuestions] = useState([emptyQuestion()]);
   const [submitting, setSubmitting] = useState(false);
@@ -119,9 +115,9 @@ export default function CreateSessionPage() {
       }
     }
 
-    navigate("/dashboard", {
+    navigate(`/practice/${session.id}`, {
       replace: true,
-      state: { inviteToken: session.invite_token },
+      state: { sessionId: session.id },
     });
   };
 
@@ -129,13 +125,13 @@ export default function CreateSessionPage() {
     <AppShell>
       <div className="mb-8">
         <Link to="/dashboard" className="text-sm font-medium text-brand-700 hover:underline">
-          ← Back to sessions
+          ← Back to my practice
         </Link>
         <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900">
-          Create interview session
+          Create practice interview
         </h1>
         <p className="mt-1 text-sm text-slate-600">
-          Configure the interview and add the questions the candidate should receive.
+          Upload a role and resume, review the AI match, then practice the questions it drafts.
         </p>
       </div>
 
@@ -152,7 +148,7 @@ export default function CreateSessionPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-panel">
-          <h2 className="text-lg font-semibold text-slate-900">Session details</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Role and resume</h2>
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
             <div>
               <label htmlFor="job_description_file" className="field-label">Job description file</label>
@@ -210,31 +206,6 @@ export default function CreateSessionPage() {
                 </div>
               </div>
             )}
-            <div>
-              <label htmlFor="candidate_name" className="field-label">Candidate name</label>
-              <input
-                id="candidate_name"
-                name="candidate_name"
-                required
-                value={form.candidate_name}
-                onChange={updateField}
-                className="field-input"
-                placeholder="Aarav Mehta"
-              />
-            </div>
-            <div>
-              <label htmlFor="candidate_email" className="field-label">Candidate email</label>
-              <input
-                id="candidate_email"
-                name="candidate_email"
-                type="email"
-                required
-                value={form.candidate_email}
-                onChange={updateField}
-                className="field-input"
-                placeholder="candidate@example.com"
-              />
-            </div>
             <div className="sm:col-span-2">
               <label htmlFor="jd_text" className="field-label">Job description</label>
               <textarea
@@ -247,32 +218,6 @@ export default function CreateSessionPage() {
                 className="field-input resize-y"
                 placeholder="Paste the complete job description here…"
               />
-            </div>
-            <div>
-              <label htmlFor="tts_provider" className="field-label">Voice provider</label>
-              <select
-                id="tts_provider"
-                name="tts_provider"
-                value={form.tts_provider}
-                onChange={updateField}
-                className="field-input"
-              >
-                <option value="sarvam">Sarvam</option>
-                <option value="supertonic">Supertonic</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="stt_provider" className="field-label">Transcription provider</label>
-              <select
-                id="stt_provider"
-                name="stt_provider"
-                value={form.stt_provider}
-                onChange={updateField}
-                className="field-input"
-              >
-                <option value="whisper">Whisper</option>
-                <option value="seamless">Seamless</option>
-              </select>
             </div>
           </div>
         </section>
@@ -345,7 +290,7 @@ export default function CreateSessionPage() {
         <div className="flex justify-end gap-3">
           <Link to="/dashboard" className="btn-secondary">Cancel</Link>
           <button type="submit" disabled={submitting || Boolean(createdSession)} className="btn-primary">
-            {submitting ? "Creating interview…" : "Create interview and invite link"}
+            {submitting ? "Saving practice…" : "Create practice interview"}
           </button>
         </div>
       </form>

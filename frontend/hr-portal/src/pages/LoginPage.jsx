@@ -47,7 +47,7 @@ export default function LoginPage() {
   };
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to manage interview sessions.">
+    <AuthLayout title="Welcome back" subtitle="Sign in to continue your interview practice.">
       {location.state?.registered && (
         <Alert tone="success">Account created successfully. You can now sign in.</Alert>
       )}
@@ -64,7 +64,7 @@ export default function LoginPage() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             className="field-input"
-            placeholder="hr@company.com"
+            placeholder="you@example.com"
           />
         </div>
         <div>

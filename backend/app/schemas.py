@@ -6,8 +6,9 @@ from pydantic import BaseModel, EmailStr, Field
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=8, max_length=72)
     full_name: str
+    consent: bool
 
 
 class UserOut(BaseModel):
@@ -17,7 +18,7 @@ class UserOut(BaseModel):
     created_at: datetime
 
     class Config:
-        from_attributes = True  # lets this build directly from a SQLAlchemy User object
+        from_attributes = True
 
 
 class Token(BaseModel):
@@ -28,12 +29,9 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: str | None = None
 
-# ---------- Sessions (HR-side) ----------
 
 class SessionCreate(BaseModel):
     jd_text: str
-    candidate_name: str
-    candidate_email: str
     resume_text: str | None = None
     assessment: dict | None = None
     tts_provider: Literal["sarvam", "supertonic"] = "sarvam"
@@ -47,7 +45,6 @@ class SessionOut(BaseModel):
     status: str
     tts_provider: Literal["sarvam", "supertonic"]
     stt_provider: Literal["whisper", "seamless"]
-    invite_token: str
     created_at: datetime
     match_score: int | None = None
     match_report: dict | None = None
@@ -73,14 +70,14 @@ class QuestionOut(BaseModel):
         from_attributes = True
 
 
-# ---------- Interview (candidate-side) ----------
+class SessionDetailOut(SessionOut):
+    questions: list[QuestionOut]
+
 
 class InterviewSessionOut(BaseModel):
     jd_text: str
     status: str
     questions: list[QuestionOut]
-    match_score: int | None = None
-    match_report: dict | None = None
 
     class Config:
         from_attributes = True
@@ -88,3 +85,7 @@ class InterviewSessionOut(BaseModel):
 
 class PracticeAnswerCreate(BaseModel):
     answer: str = Field(min_length=1, max_length=12000)
+
+
+class PracticeSpeechRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)

@@ -16,8 +16,8 @@ backend/
     main.py              # FastAPI app entrypoint
     routers/
       auth.py            # /auth/register, /auth/login, /auth/me
-      sessions.py        # /sessions — HR creates sessions + questions
-      interview.py       # /interview/{invite_token} — candidate join + Daily room
+      sessions.py        # /sessions — students create their own practice plans
+      interview.py       # private practice, speech, reports, and legacy invite preview
     agents/              # interview AI logic
       llm.py             # LLM client (Gemini primary, Groq fallback)
       interviewer_agent.py  # follow-up vs. next-question decision loop
@@ -28,8 +28,8 @@ backend/
   test_llm_interviewer.py  # manual script: exercises the LLM + agent loop
   test_tts_comparison.py   # manual script: benchmarks Supertonic vs. Sarvam
 frontend/
-  hr-portal/             # HR: login, create sessions, draft questions  (port 5173)
-  candidate-app/         # candidate: join call, camera/mic, talk to the AI (port 3000)
+  hr-portal/             # unified student login, preparation, practice (port 5173)
+  candidate-app/         # redirects old links to the unified student workspace
 docker-compose.yml       # Postgres 16 for local dev
 ```
 
@@ -85,10 +85,10 @@ Set a real `JWT_SECRET` in `.env` before doing anything beyond local poking.
 The LLM/STT/TTS keys are only needed for the voice phases — auth, sessions, and
 question drafting work without them.
 
-## 3. Frontends
+## 3. Student workspace
 
-Two separate Vite apps, each in its own terminal. Both read `VITE_API_URL`
-(defaults documented in each `.env.example`).
+The student workspace is the single frontend. It reads `VITE_API_URL` from
+`frontend/hr-portal/.env` (defaults documented in `.env.example`).
 
 ```bash
 cd frontend/hr-portal
@@ -97,31 +97,30 @@ cp .env.example .env
 npm run dev                    # http://localhost:5173
 ```
 
-```bash
-cd frontend/candidate-app
-npm install
-cp .env.example .env
-npm run dev                    # http://localhost:3000
-```
-
-Both ports are already in the backend's CORS allowlist. `npm run build` emits
-to `dist/`, `npm run preview` serves that build.
+`npm run build` emits to `dist/`; `npm run preview` serves that build.
 
 ## Resume-based practice
 
-From the HR portal, upload a text-based PDF, DOCX, or TXT job description and
-resume (8 MB maximum each). The Gemini model configured by `LLM_API_KEY`
+Create one student account and sign in to the student workspace. Accept the
+practice-data consent during registration. Upload a text-based PDF, DOCX, or TXT
+job description and resume (8 MB maximum each). The Gemini model configured by `LLM_API_KEY`
 estimates role alignment, highlights strengths and learning gaps, and drafts
 editable interview questions. Create the session to get a candidate invite
 link.
 
-Students can use that link to answer the questions in an AI-guided text practice
-round. Each answer receives a score and coaching notes; the final report gives
-next steps, and additional rounds are saved so students can compare progress.
-The resume, answers, and reports are stored in the configured database and are
-available to anyone with the invite link. Scores are educational estimates,
-not hiring decisions. The existing Daily video room remains an optional,
-separate feature; the coached practice round is text-based.
+The student starts practice directly in the same signed-in workspace. They can
+listen to a question and record an answer; the transcript is editable before it
+is submitted for coaching. If audio capture or a configured speech provider is
+unavailable, students can answer by typing. Each answer receives a score and
+coaching notes; the final report gives next steps, and additional rounds are
+saved so the student can compare progress. Session data is scoped to the
+account. Students can export or delete their account and practice data. Scores
+are educational estimates, not hiring decisions.
+
+Each answer is scored on role relevance, specific evidence, answer structure,
+and clarity. Each dimension is scored from 0 to 10 and weighted equally in the
+overall practice score. The report shows the evidence notes for each dimension
+so students can see what informed the score and what to try next.
 
 ## Manual test scripts
 
@@ -135,11 +134,12 @@ python test_tts_comparison.py     # needs a local Supertonic server + SARVAM_API
 
 ## Phases
 
-1. **Phase 0** (done): repo scaffold, DB models, JWT auth
-2. **Phase 1** (done): HR portal — session creation, question drafting, invite links
-3. **Phase 2** (done): Candidate app — join screen, camera/mic, Daily call room
-4. **Phase 3**: Interview bot v1 — bot joins the call, reads admin questions in order
-5. **Phase 4** (in progress): Interview bot v2 — LLM cross-questioning loop
-   (`interviewer_agent.py` is built; `stt.py` is not wired into the call yet)
-6. **Phase 5**: Recording + transcript storage + HR report view
-7. **Phase 6**: Hook up resume/JD-matching endpoints to auto-draft questions
+1. **Phase 0** (done): repo scaffold, database models, and authentication
+2. **Phase 1** (done): one student workspace, consent, account-scoped practice data,
+  export, and deletion
+3. **Phase 2** (done): transparent educational rubric, evidence notes, and
+  dimension-level progress across practice rounds
+4. **Phase 3** (in progress): voice-enabled practice with editable
+  transcription and spoken question prompts
+5. **Phase 4**: scheduling and study-plan reminders
+6. **Phase 5**: optional instructor sharing and cohort progress tools

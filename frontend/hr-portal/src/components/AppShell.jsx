@@ -25,14 +25,14 @@ export default function AppShell({ children }) {
           <div className="flex items-center gap-8">
             <Link to="/dashboard" className="text-base font-bold text-slate-900">
               AI Interview Coach
-              <span className="ml-2 text-xs font-medium text-slate-500">HR Portal</span>
+              <span className="ml-2 text-xs font-medium text-slate-500">Student Workspace</span>
             </Link>
             <nav className="hidden items-center gap-1 sm:flex">
               <NavLink to="/dashboard" className={navClass}>
-                Sessions
+                My practice
               </NavLink>
               <NavLink to="/sessions/new" className={navClass}>
-                Create session
+                New practice
               </NavLink>
             </nav>
           </div>
